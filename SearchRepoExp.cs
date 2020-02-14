@@ -2,17 +2,24 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using GitHubJwt;
 using Octokit;
 
 namespace SearchRepoExp {
     public class SearchExperiment {
         private GitHubClient client;
-        public SearchExperiment (string baseUri, string personalAccessToken) {
+        public SearchExperiment (string baseUri, string appKeyFile) {
             this.client = new GitHubClient (
                 new ProductHeaderValue ("Experimental-Search"),
                 new Uri (baseUri)
             );
-            this.client.Credentials = new Credentials (personalAccessToken);
+            GitHubJwtFactory generator = new GitHubJwtFactory (new FilePrivateKeySource (appKeyFile),
+                new GitHubJwtFactoryOptions { AppIntegrationId = 53, ExpirationSeconds = 600 });
+            this.client.Credentials = new Credentials (generator.CreateEncodedJwtToken (), AuthenticationType.Bearer);
+            var app = this.client.GitHubApps.GetCurrent ().Result;
+            var installations = this.client.GitHubApps.GetAllInstallationsForCurrent ().Result;
+            var response = this.client.GitHubApps.CreateInstallationToken (installations[0].Id).Result;
+            this.client.Credentials = new Credentials (response.Token);
         }
 
         public async Task<List<Repository>> RequestUserRepositories (string gitUser) {
